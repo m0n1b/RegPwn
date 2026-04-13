@@ -6,6 +6,10 @@ namespace RegPwn
 {
     public class WindowsApi
     {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool Wow64DisableWow64FsRedirection(ref IntPtr ptr);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool Wow64RevertWow64FsRedirection(IntPtr ptr);
         [DllImport("ntdll.dll", CharSet = CharSet.Unicode)]
         public static extern uint NtDeleteKey(IntPtr KeyHandle);
 
