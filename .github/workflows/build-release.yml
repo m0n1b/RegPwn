@@ -23,17 +23,17 @@ jobs:
       uses: NuGet/setup-nuget@v2
 
     - name: Restore NuGet packages
-      run: nuget restore RegPwn/RegPwn.csproj
+      run: nuget restore RegPwn/RegPwn.csproj -PackagesDirectory RegPwn/packages -SolutionDirectory RegPwn
 
     - name: Build
-      run: msbuild RegPwn/RegPwn.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath=../bin/Release
+      run: msbuild RegPwn/RegPwn.csproj /p:Configuration=Release /p:Platform=AnyCPU
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v1.0.${{ github.run_number }}
         name: RegPwn Release v1.0.${{ github.run_number }}
-        files: bin/Release/RegPwn.exe
+        files: RegPwn/bin/Release/RegPwn.exe
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
