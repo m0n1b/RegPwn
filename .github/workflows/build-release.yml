@@ -1,0 +1,39 @@
+name: Build and Release RegPwn
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+
+    - name: Restore NuGet packages
+      run: nuget restore RegPwn/RegPwn.csproj
+
+    - name: Build
+      run: msbuild RegPwn/RegPwn.csproj /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath=../bin/Release
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v1.0.${{ github.run_number }}
+        name: RegPwn Release v1.0.${{ github.run_number }}
+        files: bin/Release/RegPwn.exe
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
